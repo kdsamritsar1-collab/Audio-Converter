@@ -4,75 +4,79 @@ import numpy as np
 import matplotlib.pyplot as plt
 import io
 
-st.set_page_config(page_title="Ruhani Audio Pro", page_icon="🎙️")
+st.set_page_config(page_title="Ruhani Pro Audio Editor", layout="wide")
+
+# Custom CSS for better look
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; }
+    .stSlider { padding-top: 20px; }
+    </style>
+    """, unsafe_allow_html=True)
 
 st.title("🎙️ Ruhani Advanced Audio Studio")
-st.caption("Trim, Boost & Normalize for Ikjot Ruhani Records")
+st.write("---")
 
-uploaded_file = st.file_uploader("Upload Audio File", type=['mp3', 'm4a', 'wav', 'ogg'])
+uploaded_file = st.file_uploader("Upload your recording (MP3, WAV, M4A)", type=['mp3', 'm4a', 'wav', 'ogg'])
 
-if uploaded_file is not None:
-    # 1. Load Audio using Pydub (Much more stable for Streamlit)
-    with st.spinner("Loading audio..."):
-        audio = AudioSegment.from_file(uploaded_file)
-        duration_secs = len(audio) / 1000.0
-
-    # 2. FIXED Visualization (No more Libsndfile Error)
-    st.subheader("🔊 Visual Waveform")
-    with st.spinner("Generating waveform..."):
-        # Convert pydub audio to numpy array
-        samples = np.array(audio.get_array_of_samples())
-        
-        # If stereo, take only one channel for plotting
-        if audio.channels == 2:
-            samples = samples.reshape((-1, 2))[:, 0]
-        
-        # Plotting the wave
-        fig, ax = plt.subplots(figsize=(12, 3))
-        # Plotting every 100th sample for speed
-        ax.plot(samples[::100], color="#1DB954", linewidth=0.5)
-        ax.set_axis_off()  # Cleaning up the look
-        st.pyplot(fig)
-
-    # 3. Processing Controls
-    st.subheader("⚙️ Audio Processing")
+if uploaded_file:
+    # 1. Load & Basic Info
+    audio = AudioSegment.from_file(uploaded_file)
+    duration = len(audio) / 1000.0
     
-    col1, col2 = st.columns(2)
-    with col1:
-        boost_db = st.slider("Volume Boost (dB)", 0, 20, 5, help="Increase loudness.")
-    with col2:
-        normalize = st.checkbox("Normalize Audio", value=True, help="Balances loud/quiet parts.")
+    # 2. Top Preview Player (Sunne ke liye)
+    st.subheader("🎵 Listen to Original")
+    st.audio(uploaded_file)
+    
+    # 3. Waveform Visualization
+    st.subheader("📊 Audio Timeline Visual")
+    samples = np.array(audio.get_array_of_samples())
+    if audio.channels == 2:
+        samples = samples.reshape((-1, 2))[:, 0]
+    
+    fig, ax = plt.subplots(figsize=(15, 3))
+    # Timeline points for X-axis
+    time_axis = np.linspace(0, duration, len(samples[::200]))
+    ax.fill_between(time_axis, samples[::200], color='#1DB954', alpha=0.7)
+    ax.set_xlabel("Time (Seconds)")
+    ax.set_facecolor('#0e1117')
+    fig.patch.set_facecolor('#0e1117')
+    ax.tick_params(colors='white')
+    st.pyplot(fig)
 
-    start_time, end_time = st.slider(
-        "Select Trim Range (Seconds)",
-        0.0, float(duration_secs), (0.0, float(duration_secs)),
-        step=0.1
-    )
+    # 4. Interactive Sliders & Controls
+    st.write("---")
+    col_trim, col_effects = st.columns([2, 1])
 
-    # 4. Processing Logic
-    if st.button("🚀 Apply & Export to WAV"):
-        with st.spinner("Processing..."):
-            # A. Trim
-            processed = audio[start_time * 1000 : end_time * 1000]
+    with col_trim:
+        st.subheader("✂️ Trim Settings")
+        # Ye slider aapko "Slide" karne ki poori flexibility dega
+        start_time, end_time = st.slider(
+            "Set Start & End Points",
+            0.0, float(duration), (0.0, float(duration)),
+            step=0.1, format="%.1fs"
+        )
+        st.write(f"Selection: **{start_time}s** to **{end_time}s** (Total: {round(end_time-start_time, 2)}s)")
+
+    with col_effects:
+        st.subheader("🎚️ Enhancements")
+        boost = st.select_slider("Volume Boost", options=[0, 3, 6, 10, 15, 20], value=5)
+        do_norm = st.toggle("Auto-Normalize (Clean Sound)", value=True)
+
+    # 5. Process & Download
+    if st.button("🚀 Process Trimmed Audio", use_container_width=True):
+        with st.spinner("Cutting and Enhancing..."):
+            # Trimming
+            cut = audio[start_time*1000 : end_time*1000]
+            # Boosting
+            if boost > 0: cut = cut + boost
+            # Normalizing
+            if do_norm: cut = effects.normalize(cut)
             
-            # B. Boost Volume
-            if boost_db > 0:
-                processed = processed + boost_db
+            # Result
+            out = io.BytesIO()
+            cut.export(out, format="wav")
             
-            # C. Normalize
-            if normalize:
-                processed = effects.normalize(processed)
-            
-            # D. Export to Buffer
-            wav_buffer = io.BytesIO()
-            processed.export(wav_buffer, format="wav")
-            
-            st.success("Audio Processed Successfully!")
-            st.audio(wav_buffer, format="audio/wav")
-            
-            st.download_button(
-                label="📥 Download Pro WAV",
-                data=wav_buffer.getvalue(),
-                file_name=f"pro_{uploaded_file.name.split('.')[0]}.wav",
-                mime="audio/wav"
-            )
+            st.success("Trimmed & Enhanced Version Ready!")
+            st.audio(out, format="audio/wav")
+            st.download_button("📥 Download Pro WAV", out.getvalue(), f"ruhani_pro_{start_time}s.wav")
