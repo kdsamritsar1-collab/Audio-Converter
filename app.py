@@ -1,64 +1,90 @@
+# --- STEP 1: COMPATIBILITY PATCH FOR PYTHON 3.13+ ---
 import sys
-
-# --- Professional Python 3.13/3.14 Patch ---
 try:
     import audioop
 except ImportError:
     try:
-        # यह लाइब्रेरी ratecv जैसे असली फंक्शन प्रदान करती है
         import audioop_lpm as audioop
         sys.modules['audioop'] = audioop
     except ImportError:
-        st.error("Error: audioop-lpm not found. Please add it to requirements.txt")
-# ------------------------------------------
+        pass # Streamlit will handle errors if dependencies are missing
 
+# --- STEP 2: IMPORTS ---
 import streamlit as st
 from pydub import AudioSegment
 import io
 import zipfile
 
-# ... बाकी का कन्वर्जन कोड ...
+# --- STEP 3: UI SETUP ---
+st.set_page_config(page_title="Ruhani Audio Studio", page_icon="🎧", layout="centered")
 
+st.title("🎧 Ruhani Audio Studio")
+st.subheader("Professional MP3 to WAV Converter")
+st.markdown("""
+यह टूल आपकी फाइल्स को **Studio Standard (16-bit, 44.1 kHz, Stereo)** में बदलता है।  
+*DistroKid, Spotify और Apple Music के लिए एकदम सही।*
+""")
 
-st.set_page_config(page_title="Ruhani Audio Lab", layout="wide")
-
-st.title("🎧 Ruhani Studio Audio Converter")
-
-# Check for ffmpeg
-try:
-    AudioSegment.from_mono_audiosegments # Simple check
-except Exception:
-    st.error("ffmpeg is not installed. Please make sure 'packages.txt' has 'ffmpeg' written in it.")
-
-uploaded_files = st.file_uploader("MP3 फाइल्स अपलोड करें", type=["mp3"], accept_multiple_files=True)
+# --- STEP 4: CONVERSION LOGIC ---
+uploaded_files = st.file_uploader("अपनी MP3 फाइलें यहाँ अपलोड करें", type=["mp3"], accept_multiple_files=True)
 
 if uploaded_files:
-    if st.button("Convert to Studio WAV (16-bit, 44.1kHz)"):
-        converted_list = []
-        progress = st.progress(0)
+    st.info(f"कुल {len(uploaded_files)} फाइलें प्रोसेस के लिए तैयार हैं।")
+    
+    if st.button("🚀 Start Bulk Conversion"):
+        converted_items = []
+        progress_bar = st.progress(0)
+        status_text = st.empty()
         
-        for i, file in enumerate(uploaded_files):
+        for index, file in enumerate(uploaded_files):
             try:
+                status_text.text(f"प्रक्रिया जारी है: {file.name}")
+                
                 # ऑडियो लोड करें
-                song = AudioSegment.from_file(file, format="mp3")
+                audio = AudioSegment.from_file(file, format="mp3")
                 
-                # प्रोफेशनल सेटिंग्स
-                # नोट: अगर Python 3.14 पर 'audioop' का असली फंक्शन नहीं मिला, 
-                # तो यहाँ एरर आ सकती है। इसका बेस्ट हल Python 3.12 का उपयोग करना है।
-                song = song.set_frame_rate(44100).set_channels(2).set_sample_width(2)
+                # प्रोफेशनल सेटिंग्स लागू करें
+                # Frame Rate: 44100, Channels: 2 (Stereo), Sample Width: 2 (16-bit)
+                audio = audio.set_frame_rate(44100).set_channels(2).set_sample_width(2)
                 
+                # बफर में सेव करें
                 buf = io.BytesIO()
-                song.export(buf, format="wav")
-                converted_list.append({"name": file.name.replace(".mp3", ".wav"), "data": buf.getvalue()})
-                progress.progress((i + 1) / len(uploaded_files))
+                audio.export(buf, format="wav")
+                
+                new_name = file.name.replace(".mp3", "_studio.wav")
+                converted_items.append({"name": new_name, "data": buf.getvalue()})
+                
+                # प्रोग्रेस अपडेट करें
+                progress_bar.progress((index + 1) / len(uploaded_files))
+                
             except Exception as e:
-                st.error(f"Error converting {file.name}: {e}")
+                st.error(f"Error converting {file.name}: {str(e)}")
+        
+        status_text.text("✅ कन्वर्शन पूरा हुआ!")
 
-        if converted_list:
-            zip_buf = io.BytesIO()
-            with zipfile.ZipFile(zip_buf, "w") as z:
-                for f in converted_list:
-                    z.writestr(f["name"], f["data"])
+        # --- STEP 5: DOWNLOAD SECTION ---
+        if converted_items:
+            st.divider()
             
-            st.success("Conversion Complete!")
-            st.download_button("📦 Download All as ZIP", zip_buf.getvalue(), "converted_audio.zip")
+            # ZIP फाइल तैयार करें
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as z:
+                for item in converted_items:
+                    z.writestr(item["name"], item["data"])
+            
+            # डाउनलोड बटन
+            st.download_button(
+                label="📦 Download All as ZIP",
+                data=zip_buffer.getvalue(),
+                file_name="ruhani_studio_wavs.zip",
+                mime="application/zip",
+                use_container_width=True
+            )
+            
+            # इंडिविजुअल लिस्ट
+            with st.expander("Show individual files"):
+                for item in converted_items:
+                    st.download_button(f"⬇️ {item['name']}", item['data'], item['name'])
+
+st.divider()
+st.caption("Developed for @ruhanijot | 16-bit / 44.1kHz Stereo Standard")
