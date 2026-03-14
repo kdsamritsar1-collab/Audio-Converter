@@ -1,69 +1,69 @@
 import streamlit as st
-from pydub import AudioSegment
+from pydub import AudioSegment, effects
+import librosa
+import librosa.display
+import matplotlib.pyplot as plt
 import io
-import zipfile
 
-# UI Setup
-st.set_page_config(page_title="Ruhani Audio Studio", page_icon="🎧")
+st.set_page_config(page_title="Ruhani Audio Pro", page_icon="🎙️")
 
-st.title("🎧 Ruhani Audio Studio")
-st.write("Convert MP3 to **16-bit, 44.1 kHz, Stereo WAV**")
+st.title("🎙️ Ruhani Advanced Audio Studio")
+st.caption("Trim, Boost & Normalize for Ikjot Ruhani Records")
 
-uploaded_files = st.file_uploader("MP3 फाइलें चुनें", type=["mp3"], accept_multiple_files=True)
+uploaded_file = st.file_uploader("Upload Audio File", type=['mp3', 'm4a', 'wav', 'ogg'])
 
-if uploaded_files:
-    if st.button("🚀 Start Conversion"):
-        converted_items = []
-        progress_bar = st.progress(0)
-        
-        for index, file in enumerate(uploaded_files):
-            try:
-                # ऑडियो लोड और प्रोसेस करें
-                audio = AudioSegment.from_file(file, format="mp3")
-                # Professional Settings: 44.1kHz, Stereo, 16-bit
-                audio = audio.set_frame_rate(44100).set_channels(2).set_sample_width(2)
-                
-                buf = io.BytesIO()
-                audio.export(buf, format="wav")
-                
-                new_name = file.name.replace(".mp3", "_studio.wav")
-                converted_items.append({"name": new_name, "data": buf.getvalue()})
-                
-                progress_bar.progress((index + 1) / len(uploaded_files))
-            except Exception as e:
-                st.error(f"Error in {file.name}: {e}")
-        
-        if converted_items:
-            st.success("Conversion Complete!")
-            st.divider()
+if uploaded_file is not None:
+    # 1. Load Audio
+    audio = AudioSegment.from_file(uploaded_file)
+    duration_secs = len(audio) / 1000.0
 
-            # --- स्मार्ट डाउनलोड लॉजिक ---
-            if len(converted_items) == 1:
-                # सिर्फ एक फाइल होने पर सीधा .wav डाउनलोड करें
-                single_file = converted_items[0]
-                st.info(f"फाइल तैयार है: {single_file['name']}")
-                st.download_button(
-                    label="📥 Download WAV File",
-                    data=single_file["data"],
-                    file_name=single_file["name"],
-                    mime="audio/wav",
-                    use_container_width=True
-                )
-            else:
-                # एक से ज्यादा फाइल्स होने पर ZIP बनाएँ
-                st.info(f"कुल {len(converted_items)} फाइल्स तैयार हैं।")
-                zip_buffer = io.BytesIO()
-                with zipfile.ZipFile(zip_buffer, "w") as z:
-                    for item in converted_items:
-                        z.writestr(item["name"], item["data"])
-                
-                st.download_button(
-                    label="📦 Download All as ZIP",
-                    data=zip_buffer.getvalue(),
-                    file_name="converted_wavs.zip",
-                    mime="application/zip",
-                    use_container_width=True
-                )
+    # 2. Visualization
+    st.subheader("🔊 Visual Waveform")
+    y, sr = librosa.load(uploaded_file, sr=None)
+    fig, ax = plt.subplots(figsize=(10, 3))
+    librosa.display.waveshow(y, sr=sr, ax=ax, color="#1DB954")
+    st.pyplot(fig)
 
-st.divider()
-st.caption("Standard for Music Distribution | Created for Ruhani Jot")
+    # 3. Controls
+    st.subheader("⚙️ Audio Processing")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        # Volume Boost in Decibels (dB)
+        boost_db = st.slider("Volume Boost (dB)", 0, 20, 0, help="0 means original volume. 10 is much louder.")
+    with col2:
+        # Normalize: Puray audio ki volume ko ek level pe lana
+        normalize = st.checkbox("Normalize Audio", value=True, help="Makes the quiet parts louder and loud parts consistent.")
+
+    start_time, end_time = st.slider(
+        "Select Trim Range (Seconds)",
+        0.0, float(duration_secs), (0.0, float(duration_secs))
+    )
+
+    # 4. Processing Logic
+    if st.button("Apply & Export to WAV"):
+        with st.spinner("Processing..."):
+            # A. Trim
+            processed = audio[start_time * 1000 : end_time * 1000]
+            
+            # B. Boost Volume
+            if boost_db > 0:
+                processed = processed + boost_db
+            
+            # C. Normalize (Peak normalization)
+            if normalize:
+                processed = effects.normalize(processed)
+            
+            # D. Export to Buffer
+            wav_buffer = io.BytesIO()
+            processed.export(wav_buffer, format="wav")
+            
+            st.success("Audio Processed Successfully!")
+            st.audio(wav_buffer, format="audio/wav")
+            
+            st.download_button(
+                label="📥 Download Pro WAV",
+                data=wav_buffer.getvalue(),
+                file_name=f"pro_{uploaded_file.name.split('.')[0]}.wav",
+                mime="audio/wav"
+            )
