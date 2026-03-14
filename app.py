@@ -1,19 +1,24 @@
-# --- Compatibility Patch for Python 3.13+ ---
 import sys
+
+# Python 3.13+ के लिए audioop का जुगाड़
 try:
     import audioop
 except ImportError:
-    try:
-        import audioop_lpm as audioop
-        sys.modules['audioop'] = audioop
-    except ImportError:
-        pass 
-# --------------------------------------------
+    # अगर सिस्टम में audioop नहीं है, तो हम एक खाली डमी क्लास बना देंगे 
+    # ताकि pydub क्रैश न हो (जब तक हम भारी काम नहीं कर रहे)
+    class DummyAudioop:
+        def __getattr__(self, name):
+            def dummy(*args, **kwargs):
+                raise NotImplementedError(f"audioop.{name} is not available in this Python version.")
+            return dummy
+    sys.modules['audioop'] = DummyAudioop()
 
 import streamlit as st
 from pydub import AudioSegment
 import io
 import zipfile
+
+# ... बाकी का कोड ...
 
 st.set_page_config(page_title="Ruhani Bulk Audio Lab", page_icon="🎚️")
 
