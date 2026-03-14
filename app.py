@@ -1,12 +1,15 @@
-# app.py की सबसे पहली लाइन
+# --- Compatibility Patch for Python 3.13+ ---
+import sys
 try:
     import audioop
 except ImportError:
-    import audioop_lpm as audioop
-    import sys
-    sys.modules['audioop'] = audioop
+    try:
+        import audioop_lpm as audioop
+        sys.modules['audioop'] = audioop
+    except ImportError:
+        pass 
+# --------------------------------------------
 
-# ... (बाकी का कोड नीचे वैसा ही रहेगा)
 import streamlit as st
 from pydub import AudioSegment
 import io
