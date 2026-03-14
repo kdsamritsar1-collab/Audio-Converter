@@ -1,22 +1,24 @@
 import sys
 
-# --- Python 3.13/3.14 Compatibility Patch ---
+# --- Professional Python 3.13/3.14 Patch ---
 try:
     import audioop
 except ImportError:
-    # अगर audioop गायब है, तो हम खुद का एक छोटा वर्जन बना लेते हैं
-    # यह pydub को क्रैश होने से बचाएगा
-    from types import ModuleType
-    mock_audioop = ModuleType("audioop")
-    mock_audioop.error = Exception
-    # ज़रूरी फंक्शन्स जो pydub मांगता है
-    mock_audioop.getsample = lambda *a: None 
-    sys.modules["audioop"] = mock_audioop
+    try:
+        # यह लाइब्रेरी ratecv जैसे असली फंक्शन प्रदान करती है
+        import audioop_lpm as audioop
+        sys.modules['audioop'] = audioop
+    except ImportError:
+        st.error("Error: audioop-lpm not found. Please add it to requirements.txt")
+# ------------------------------------------
 
 import streamlit as st
 from pydub import AudioSegment
 import io
 import zipfile
+
+# ... बाकी का कन्वर्जन कोड ...
+
 
 st.set_page_config(page_title="Ruhani Audio Lab", layout="wide")
 
