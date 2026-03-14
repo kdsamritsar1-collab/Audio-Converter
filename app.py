@@ -18,13 +18,11 @@ if uploaded_files:
         
         for index, file in enumerate(uploaded_files):
             try:
-                # ऑडियो लोड करें
+                # ऑडियो लोड और प्रोसेस करें
                 audio = AudioSegment.from_file(file, format="mp3")
-                
-                # प्रोफेशनल सेटिंग्स (Python 3.12 में यह बिना पैच के चलेगा)
+                # Professional Settings: 44.1kHz, Stereo, 16-bit
                 audio = audio.set_frame_rate(44100).set_channels(2).set_sample_width(2)
                 
-                # बफर में सेव करें
                 buf = io.BytesIO()
                 audio.export(buf, format="wav")
                 
@@ -37,19 +35,35 @@ if uploaded_files:
         
         if converted_items:
             st.success("Conversion Complete!")
-            
-            # ZIP फाइल बनाएँ
-            zip_buffer = io.BytesIO()
-            with zipfile.ZipFile(zip_buffer, "w") as z:
-                for item in converted_items:
-                    z.writestr(item["name"], item["data"])
-            
-            st.download_button(
-                label="📦 Download All as ZIP",
-                data=zip_buffer.getvalue(),
-                file_name="converted_wavs.zip",
-                mime="application/zip"
-            )
+            st.divider()
+
+            # --- स्मार्ट डाउनलोड लॉजिक ---
+            if len(converted_items) == 1:
+                # सिर्फ एक फाइल होने पर सीधा .wav डाउनलोड करें
+                single_file = converted_items[0]
+                st.info(f"फाइल तैयार है: {single_file['name']}")
+                st.download_button(
+                    label="📥 Download WAV File",
+                    data=single_file["data"],
+                    file_name=single_file["name"],
+                    mime="audio/wav",
+                    use_container_width=True
+                )
+            else:
+                # एक से ज्यादा फाइल्स होने पर ZIP बनाएँ
+                st.info(f"कुल {len(converted_items)} फाइल्स तैयार हैं।")
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w") as z:
+                    for item in converted_items:
+                        z.writestr(item["name"], item["data"])
+                
+                st.download_button(
+                    label="📦 Download All as ZIP",
+                    data=zip_buffer.getvalue(),
+                    file_name="converted_wavs.zip",
+                    mime="application/zip",
+                    use_container_width=True
+                )
 
 st.divider()
 st.caption("Standard for Music Distribution | Created for Ruhani Jot")
