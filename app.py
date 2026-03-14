@@ -1,3 +1,12 @@
+# app.py की सबसे पहली लाइन
+try:
+    import audioop
+except ImportError:
+    import audioop_lpm as audioop
+    import sys
+    sys.modules['audioop'] = audioop
+
+# ... (बाकी का कोड नीचे वैसा ही रहेगा)
 import streamlit as st
 from pydub import AudioSegment
 import io
